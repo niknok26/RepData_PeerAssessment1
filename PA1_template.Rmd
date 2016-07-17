@@ -8,18 +8,75 @@ output:
 
 ## Loading and preprocessing the data
 
-
+```{r Loading Data}
+activities <- read.table(unz("activity.zip","activity.csv"),head=TRUE,sep=",",na.strings ="NA")
+head(activities)
+```
 
 ## What is mean total number of steps taken per day?
-
-
+```{r Summarize Data}
+require(dplyr)
+totalStepsPerDay <- activities %>% group_by(date) %>% summarize(steps=sum(steps,na.rm=TRUE))
+hist(totalStepsPerDay$steps,xlab="Total Steps Per Day",main="Histogram for Total Steps Per Day")
+mean(totalStepsPerDay$steps,na.rm=TRUE)
+median(totalStepsPerDay$steps,na.rm=TRUE)
+```
 
 ## What is the average daily activity pattern?
+```{r Daily Average}
+require(dplyr)
+require(ggplot2)
+averageStepsPerInterval <- activities %>% group_by(interval) %>% summarize(mean=mean(steps,na.rm=TRUE))
+averageStepsPerInterval$interval <- as.factor( sprintf("%02d:%02d",averageStepsPerInterval$interval%/%100,averageStepsPerInterval$interval%%100))
+ggplot(averageStepsPerInterval,aes(interval,mean)) + 
+          geom_line(group=1) + 
+          scale_x_discrete(breaks=c("00:00","06:00","12:00","18:00","23:55")) +
+          labs(x="Time of Day",y="Daily Steps Average") +
+          geom_vline(xintercept = which.max(averageStepsPerInterval$mean), colour = "red", linetype="dotted" )
+```
 
-
+#### Interval with the Maximum Mean
+```{r Max Mean Interval}
+averageStepsPerInterval[which.max(averageStepsPerInterval$mean),]
+```
 
 ## Imputing missing values
+#### Total Number of Rows with NA values
+```{r}
+nrow(activities[is.na(activities$steps),])
+```
+### Create new data set and replace NAs with interval median
+#### Compute for the median per interval.  COMPUTING PER DAY WILL NOT YIELD ANY DIFFERENCE..
+```{r}
+activities$steps <- ifelse(is.na(activities$steps),
+                           ave(activities$steps,activities$interval,FUN=function(x) median(x,na.rm=TRUE)),
+                           activities$steps)
+```
 
-
+#### Create new report after replacing NAs with computed values
+```{r Summarize New Data}
+newTotalStepsPerDay <- activities %>% group_by(date) %>% summarize(steps=sum(steps))
+hist(newTotalStepsPerDay$steps,xlab="New Total Steps Per Day",main="New Histogram for Total Steps Per Day")
+mean(newTotalStepsPerDay$steps,na.rm=TRUE)
+median(newTotalStepsPerDay$steps,na.rm=TRUE)
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+### Add a column indicating the day of the week for the dataset
+```{r}
+activities$wday <- as.factor(  ifelse( as.POSIXlt(activities$date)$wday %in% c(0,6),
+                                       "Weekend",
+                                       "Weekday"
+                                     )
+                            )
+head(activities)
+
+averageStepsPerInterval <- activities %>% group_by(interval,wday) %>% summarize(mean=mean(steps,na.rm=TRUE))
+averageStepsPerInterval$interval <- as.factor( sprintf("%02d:%02d",averageStepsPerInterval$interval%/%100,averageStepsPerInterval$interval%%100))
+ggplot(averageStepsPerInterval,aes(interval,mean)) + 
+          geom_line(group=1) + 
+          scale_x_discrete(breaks=c("00:00","06:00","12:00","18:00","23:55")) +
+          labs(x="Time of Day",y="Daily Steps Average") +
+          facet_grid( wday ~ .)
+
+```
